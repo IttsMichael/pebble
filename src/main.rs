@@ -62,24 +62,28 @@ fn run_app<B: Backend + io::Write>(terminal: &mut Terminal<B>, app: &mut App) ->
             return Ok(());
         }
 
-        // Handle specific state transitions (like running the install blocking)
-        if app.should_install {
-            // Restore terminal to let `pacman` and `sudo` draw securely to standard out
-            disable_raw_mode()?;
-            execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-            terminal.show_cursor().unwrap();
-            
-            app.execute_install();
-            app.should_install = false; // Reset trigger
-            
-            // Wait for user to read output, then bring the TUI hub back online
-            println!("\nPress Enter to return to Pebble Hub...");
-            let mut buf = String::new();
-            io::stdin().read_line(&mut buf)?;
-            
-            enable_raw_mode()?;
-            execute!(terminal.backend_mut(), EnterAlternateScreen)?;
-            terminal.clear().unwrap();
+        // We poll the RX queue continuously and update the UI natively
+        if let Some(rx) = &app.install_rx {
+            while let Ok(msg) = rx.try_recv() {
+                if msg.starts_with("CLRLINE_ILOVECANDY") {
+                    // Update the last line for ILoveCandy animation effect!
+                    let anim_frame = msg.replace("CLRLINE_ILOVECANDY", "");
+                    if let Some(last) = app.install_logs.last_mut() {
+                        if last.starts_with("Installing...") {
+                            *last = anim_frame;
+                        } else {
+                            app.install_logs.push(anim_frame);
+                        }
+                    } else {
+                        app.install_logs.push(anim_frame);
+                    }
+                } else if msg.contains("Installation Complete") || msg.contains("failed with status") {
+                    app.install_logs.push(msg);
+                    app.mode = app::AppMode::InstallComplete;
+                } else {
+                    app.install_logs.push(msg);
+                }
+            }
         }
     }
 }

@@ -43,9 +43,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
                 app.previous();
             }
             KeyCode::Enter => {
-                if app.list_state.selected().is_some() {
-                    app.should_install = true;
-                }
+                app.execute_install();
             }
             // Allow typing instantly to jump back to search mode
             KeyCode::Char(c) => {
@@ -57,6 +55,37 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
                 app.mode = AppMode::Search;
                 app.search_input.pop();
                 app.list_state.select(None);
+            }
+            _ => {}
+        },
+
+        // --- When entering Sudo Password ---
+        AppMode::Password => match key.code {
+            KeyCode::Enter => {
+                let pw = std::mem::take(&mut app.password_input);
+                app.start_install_process(Some(pw));
+            }
+            KeyCode::Char(c) => {
+                app.password_input.push(c);
+            }
+            KeyCode::Backspace => {
+                app.password_input.pop();
+            }
+            KeyCode::Esc => {
+                app.mode = AppMode::List;
+            }
+            _ => {}
+        },
+
+        // --- Block input while installing ---
+        AppMode::Installing => {}
+
+        // --- Return to Hub ---
+        AppMode::InstallComplete => match key.code {
+            KeyCode::Enter | KeyCode::Esc => {
+                app.mode = AppMode::Search;
+                app.install_logs.clear();
+                app.install_rx = None;
             }
             _ => {}
         },

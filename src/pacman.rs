@@ -48,62 +48,94 @@ pub fn search(query: &str) -> Vec<Package> {
     results
 }
 
-/// Execute a system-level pacman install depending on flags
-pub fn install(package: &Package, config: &AppConfig) {
-    if config.beta_mode {
-        beta(package);
-    } else {
-        normal(package);
-    }
+pub fn needs_sudo_password() -> bool {
+    Command::new("sudo")
+        .args(["-n", "true"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| !s.success())
+        .unwrap_or(true)
 }
 
-fn normal(package: &Package) {
-    let package_id = package.name.split_whitespace().next().unwrap_or(&package.name);
+/// Execute a system-level pacman install depending on flags asynchronously
+pub fn install_async(
+    package: Package, 
+    password: Option<String>, 
+    tx: std::sync::mpsc::Sender<String>, 
+    config: AppConfig
+) {
+    let _ = tx.send(format!("Starting installation for {}...", package.name));
     
-    // Clear screen to give pacman clean real estate after the Alternate Screen closes!
-    print!("{esc}c", esc = 27 as char);
-
-    let mut child = Command::new("sudo")
-        .args(["pacman", "-S", package_id])
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .expect("Failed to execute sudo pacman -S");
-
-    let _ = child.wait().expect("Failed to wait on child process");
-}
-
-fn beta(package: &Package) {
-    let package_id = package.name.split_whitespace().next().unwrap_or(&package.name);
-    
-    print!("{esc}c", esc = 27 as char);
-
-    let mut child = Command::new("sudo")
-        .args(["pacman", "-S", package_id]) // In beta, omit --noconfirm for safety? Or keep it? We keep standard pacman -S for now to let user confirm size
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("Failed to execute sudo pacman -S");
-
-    if let Some(stdout) = child.stdout.take() {
-        let reader = BufReader::new(stdout);
+    std::thread::spawn(move || {
+        let package_id = package.name.split_whitespace().next().unwrap_or(&package.name).to_string();
         
-        // ILoveCandy
-        let frames = [ "C o o o", "c  o o o", "C   o o", "c    o o", "C     o", "c      o", "C       ", "c       "];
+        let mut cmd = Command::new("sudo");
+        cmd.args(["-S", "pacman", "-S", "--noconfirm", &package_id]);
         
-        // Print the custom header to bypass output!
-        println!("{}", "\nStarting masked installation...".cyan().bold());
+        cmd.stdin(Stdio::piped())
+           .stdout(Stdio::piped())
+           .stderr(Stdio::piped());
+           
+        let mut child = match cmd.spawn() {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = tx.send(format!("Failed to spawn sudo command: {}", e));
+                return;
+            }
+        };
 
-        for (frame_idx, _line) in reader.lines().enumerate() {
-            print!("\r{} [{}]", "Installing...".magenta().bold(), frames[frame_idx % frames.len()].yellow().bold());
-            io::stdout().flush().unwrap();
+        // Feed password into stdin if we have one
+        if let Some(mut stdin) = child.stdin.take() {
+            if let Some(pw) = password {
+                let _ = writeln!(stdin, "{}", pw);
+            }
         }
-        
-        print!("\r                                     \r");
-        println!("{}", "Installation complete!".green().bold());
-    }
 
-    let _ = child.wait().expect("Failed to wait on child process");
+        // Pipe stdout to the TUI renderer loop natively!
+        if let Some(stdout) = child.stdout.take() {
+            let tx_out = tx.clone();
+            std::thread::spawn(move || {
+                let reader = BufReader::new(stdout);
+                let frames = [ "C o o o", "c  o o o", "C   o o", "c    o o", "C     o", "c      o", "C       ", "c       "];
+                
+                for (frame_idx, line) in reader.lines().enumerate() {
+                    if let Ok(l) = line {
+                        if config.beta_mode {
+                            // Wipe the screen and continuously send frames
+                            let _ = tx_out.send(format!("CLRLINE_ILOVECANDYInstalling... [{}]", frames[frame_idx % frames.len()]));
+                        } else {
+                            let _ = tx_out.send(l);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Pipe stderr just in case of failure blocks
+        if let Some(stderr) = child.stderr.take() {
+            let tx_err = tx.clone();
+            std::thread::spawn(move || {
+                let reader = BufReader::new(stderr);
+                for line in reader.lines() {
+                    if let Ok(l) = line {
+                        let _ = tx_err.send(l);
+                    }
+                }
+            });
+        }
+
+        match child.wait() {
+            Ok(status) => {
+                if status.success() {
+                    let _ = tx.send(String::from("\nInstallation Complete! [Press Esc or Enter to return]"));
+                } else {
+                    let _ = tx.send(format!("\nInstallation failed with status: {} [Press Esc to return]", status));
+                }
+            }
+            Err(e) => {
+                let _ = tx.send(format!("\nFailed to wait for the command: {} [Press Esc to return]", e));
+            }
+        }
+    });
 }
