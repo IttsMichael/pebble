@@ -5,7 +5,11 @@ mod models;
 mod select;
 mod install;
 
+use crate::models::config::data::AppConfig;
+
 fn main() {
+    let config = AppConfig::parse_args();
+
     display::processor::process();
     
     let search_query = input::processor::process();
@@ -14,5 +18,5 @@ fn main() {
     
     let selected_package = select::processor::process(search_results);
     
-    install::processor::process(selected_package);
+    install::processor::process(selected_package, config);
 }
