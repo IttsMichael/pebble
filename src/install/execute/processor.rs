@@ -12,7 +12,7 @@ pub fn process(package: &Package) {
     let package_id = package.name.split_whitespace().next().unwrap_or(&package.name);
 
     let mut child = Command::new("sudo")
-        .args(["pacman", "-S", package_id])
+        .args(["pacman", "-S", "--noconfirm", package_id])
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
