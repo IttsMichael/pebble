@@ -5,18 +5,18 @@ mod models;
 mod select;
 mod install;
 
-use crate::models::config::data::AppConfig;
+use crate::models::AppConfig;
 
 fn main() {
     let config = AppConfig::parse_args();
 
-    display::processor::process();
+    display::process();
     
-    let search_query = input::processor::process();
+    let search_query = input::process();
     
-    let search_results = search::processor::process(Some(search_query));
+    let search_results = search::process(Some(search_query));
     
-    let selected_package = select::processor::process(search_results);
+    let selected_package = select::process(search_results);
     
-    install::processor::process(selected_package, config);
+    install::process(selected_package, config);
 }
