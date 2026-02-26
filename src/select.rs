@@ -8,18 +8,23 @@ pub fn process(results: Vec<Package>) -> Option<Package> {
     }
 
     let selected_index = prompt(results.len());
-    let selected_package = &results[selected_index];
     
-    if confirm(selected_package) {
-        Some(selected_package.clone())
+    if let Some(index) = selected_index {
+        let selected_package = &results[index];
+        
+        if confirm(selected_package) {
+            Some(selected_package.clone())
+        } else {
+            None
+        }
     } else {
         None
     }
 }
 
-fn prompt(max_items: usize) -> usize {
+fn prompt(max_items: usize) -> Option<usize> {
     loop {
-        print!("\n{} ", format!("Enter number to install (1-{}):, 0 to cancel", max_items).yellow().bold());
+        print!("\n{} ", format!("Enter a number to install (1-{}). 0 to go back to search:", max_items).yellow().bold());
         io::stdout().flush().unwrap();
 
         let mut input = String::new();
@@ -32,12 +37,11 @@ fn prompt(max_items: usize) -> usize {
 
         match input.parse::<usize>() {
             Ok(num) if num > 0 && num <= max_items => {
-                return num - 1;
+                return Some(num - 1);
             }
 
             Ok(0) => {
-                crate::main();
-                continue;
+                return None;
             }
 
             _ => {

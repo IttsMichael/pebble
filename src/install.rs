@@ -5,16 +5,11 @@ use crossterm::style::Stylize;
 use crate::models::{Package, AppConfig};
 
 pub fn process(package: Option<Package>, config: AppConfig) {
-    match package {
-        Some(pkg) => {
-            if config.beta_mode {
-                beta(&pkg); 
-            } else {
-                normal(&pkg);
-            }
-        }
-        None => {
-            println!("{}", "aborted".red());
+    if let Some(pkg) = package {
+        if config.beta_mode {
+            beta(&pkg); 
+        } else {
+            normal(&pkg);
         }
     }
 }

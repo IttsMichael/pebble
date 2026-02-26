@@ -13,7 +13,5 @@ fn clear() {
 }
 
 fn title() {
-    println!("{}", "Welcome to Pebble!".cyan().bold());
-    println!("{}", "Zouzitou is fucking gay".cyan().bold());
-    println!("{}", "Use karch btw\n".dim());
+    println!("{}", "Welcome to Pebble!\n".cyan().bold());
 }
