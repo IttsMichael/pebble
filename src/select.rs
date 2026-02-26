@@ -19,7 +19,7 @@ pub fn process(results: Vec<Package>) -> Option<Package> {
 
 fn prompt(max_items: usize) -> usize {
     loop {
-        print!("\n{} {} ", "Enter number to install (1-{}):".replace("{}", &max_items.to_string()).yellow().bold(), "".reset());
+        print!("\n{} ", format!("Enter number to install (1-{}):, 0 to cancel", max_items).yellow().bold());
         io::stdout().flush().unwrap();
 
         let mut input = String::new();
@@ -31,14 +31,23 @@ fn prompt(max_items: usize) -> usize {
         }
 
         match input.parse::<usize>() {
-            Ok(num) if num > 0 && num <= max_items => return num - 1, // 0-indexed
-            _ => println!("{}", "Invalid selection. Please enter a valid number.".red()),
+            Ok(num) if num > 0 && num <= max_items => {
+                return num - 1;
+            }
+
+            Ok(0) => {
+                crate::main();
+                continue;
+            }
+
+            _ => {
+                println!("{}", "Invalid selection. Please enter a valid number.".red());
+            }
         }
     }
 }
 
 fn confirm(package: &Package) -> bool {
-    // Extracting the package name cleanly from the raw pacman output line
     let package_id = package.name.split_whitespace().next().unwrap_or(&package.name);
     
     print!("\n{} {} {} ", "Do you want to install".yellow().bold(), package_id.green().bold(), "? [Y/n]".yellow().bold());
@@ -49,6 +58,5 @@ fn confirm(package: &Package) -> bool {
 
     let input = input.trim().to_lowercase();
     
-    // Default to yes if empty, otherwise check for y
     input.is_empty() || input == "y" || input == "yes"
 }
