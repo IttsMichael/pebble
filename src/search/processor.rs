@@ -1,9 +1,11 @@
 use crate::search::{execute, format};
+use crate::models::package::data::Package;
 
-pub fn process(flag: Option<String>) -> Option<String> {
+pub fn process(flag: Option<String>) -> Vec<Package> {
     if let Some(f) = flag {
-        let result = execute::processor::process(&f);
-        format::processor::process(result);
+        let results = execute::processor::process(&f);
+        format::processor::process(&results);
+        return results;
     }
-    None 
+    Vec::new()
 }
