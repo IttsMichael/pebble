@@ -38,11 +38,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
                 app.search_input.push(c);
             }
             KeyCode::Backspace => {
-                if app.search_input.is_empty() {
-                    app.mode = AppMode::Home;
-                } else {
-                    app.search_input.pop();
-                }
+                app.search_input.pop();
             }
             KeyCode::Esc => {
                 app.mode = AppMode::Home;
