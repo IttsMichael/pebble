@@ -2,6 +2,7 @@ pub mod search;
 pub mod sudo;
 pub mod install;
 pub mod uninstall;
+pub mod scoring;
 
 // Re-export specific highly used methods strictly cleanly to the frontend!
 pub use search::{search, search_installed};

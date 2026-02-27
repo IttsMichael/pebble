@@ -63,11 +63,13 @@ impl App {
     /// Triggers a background search and updates the list exactly.
     pub fn execute_search(&mut self) {
         if !self.search_input.is_empty() {
-            if self.action == ActionType::Install {
-                self.search_results = backend::search(&self.search_input);
+            let mut raw_results = if self.action == ActionType::Install {
+                backend::search(&self.search_input)
             } else {
-                self.search_results = backend::search_installed(&self.search_input);
-            }
+                backend::search_installed(&self.search_input)
+            };
+            
+            self.search_results = backend::scoring::sort_packages(&self.search_input, raw_results);
             
             if !self.search_results.is_empty() {
                 self.list_state.select(Some(0));

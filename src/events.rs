@@ -27,26 +27,33 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
 
         // --- When in the search box ---
         AppMode::Search => match key.code {
-            KeyCode::Enter => {
-                app.execute_search();
+            KeyCode::Enter | KeyCode::Down => {
                 if !app.search_results.is_empty() {
                     // Instantly shift focus to the list once results populate
-                    app.mode = AppMode::List; 
+                    app.mode = AppMode::List;
+                    app.list_state.select(Some(0));
                 }
             }
             KeyCode::Char(c) => {
                 app.search_input.push(c);
+                if app.search_input.len() >= 3 {
+                    app.execute_search();
+                }
             }
             KeyCode::Backspace => {
                 app.search_input.pop();
+                if app.search_input.len() >= 3 {
+                    app.execute_search();
+                } else if app.search_input.is_empty() {
+                    app.search_results.clear();
+                    app.list_state.select(None);
+                }
             }
             KeyCode::Esc => {
                 app.mode = AppMode::Home;
-            }
-            KeyCode::Down => {
-                if !app.search_results.is_empty() {
-                    app.mode = AppMode::List;
-                }
+                app.search_input.clear();
+                app.search_results.clear();
+                app.list_state.select(None);
             }
             _ => {}
         },
