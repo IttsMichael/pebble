@@ -63,22 +63,26 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         AppMode::Password => match key.code {
             KeyCode::Enter => {
                 let pw = std::mem::take(&mut app.password_input);
+                app.password_error = None;
                 app.start_install_process(Some(pw));
             }
             KeyCode::Char(c) => {
                 app.password_input.push(c);
+                app.password_error = None;
             }
             KeyCode::Backspace => {
                 app.password_input.pop();
+                app.password_error = None;
             }
             KeyCode::Esc => {
                 app.mode = AppMode::List;
+                app.password_error = None;
             }
             _ => {}
         },
 
-        // --- Block input while installing ---
-        AppMode::Installing => {}
+        // --- Block input while installing or authenticating ---
+        AppMode::Installing | AppMode::Authenticating => {}
 
         // --- Return to Hub ---
         AppMode::InstallComplete => match key.code {

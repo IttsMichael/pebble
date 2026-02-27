@@ -7,6 +7,7 @@ pub enum AppMode {
     Search,
     List,
     Password,
+    Authenticating,
     Installing,
     InstallComplete,
 }
@@ -24,6 +25,7 @@ pub struct App {
     
     // Installation State
     pub password_input: String,
+    pub password_error: Option<String>,
     pub install_logs: Vec<String>,
     pub install_rx: Option<std::sync::mpsc::Receiver<String>>,
     
@@ -40,6 +42,7 @@ impl App {
             search_results: Vec::new(),
             list_state: ListState::default(),
             password_input: String::new(),
+            password_error: None,
             install_logs: Vec::new(),
             install_rx: None,
             should_quit: false,
@@ -65,6 +68,7 @@ impl App {
             if pacman::needs_sudo_password() {
                 self.mode = AppMode::Password;
                 self.password_input.clear();
+                self.password_error = None;
             } else {
                 self.start_install_process(None);
             }
@@ -75,7 +79,7 @@ impl App {
     pub fn start_install_process(&mut self, password: Option<String>) {
         if let Some(i) = self.list_state.selected() {
             if let Some(pkg) = self.search_results.get(i).cloned() {
-                self.mode = AppMode::Installing;
+                self.mode = AppMode::Authenticating;
                 self.install_logs.clear();
                 
                 let (tx, rx) = std::sync::mpsc::channel();
