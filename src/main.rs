@@ -10,7 +10,7 @@ use std::time::Duration;
 mod app;
 mod ui;
 mod events;
-mod pacman;
+mod backend;
 mod models;
 
 use app::App;
@@ -65,7 +65,7 @@ fn run_app<B: Backend + io::Write>(terminal: &mut Terminal<B>, app: &mut App) ->
                 // We poll the RX queue continuously and update the UI natively
         if let Some(rx) = &app.install_rx {
             while let Ok(msg) = rx.try_recv() {
-                if msg.starts_with("Starting installation for") {
+                if msg.starts_with("Starting installation for") || msg.starts_with("Starting uninstallation for") {
                     // Auth was successful! Render the logs list going forward natively!
                     app.mode = app::AppMode::Installing;
                     app.install_logs.push(msg);
@@ -89,7 +89,7 @@ fn run_app<B: Backend + io::Write>(terminal: &mut Terminal<B>, app: &mut App) ->
                     app.install_logs.clear();
                     app.install_rx = None;
                     break;
-                } else if msg.contains("Installation Complete") || msg.contains("failed with status") {
+                } else if msg.contains("Installation Complete") || msg.contains("Uninstallation Complete") || msg.contains("failed with status") {
                     app.install_logs.push(msg);
                     app.mode = app::AppMode::InstallComplete;
                 } else {

@@ -42,7 +42,7 @@ fn draw_header(f: &mut Frame, _app: &mut App, area: Rect) {
 fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     if app.mode == AppMode::Installing || app.mode == AppMode::InstallComplete || app.mode == AppMode::Authenticating {
         let block = Block::default()
-            .title(" Installation Logs ")
+            .title(if app.action == crate::app::ActionType::Install { " Installation Logs " } else { " Uninstallation Logs " })
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Magenta));
             
@@ -54,6 +54,46 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         let text: Vec<Line> = app.install_logs.iter().map(|l| Line::from(l.clone())).collect();
         let paragraph = Paragraph::new(text).block(block).scroll((scroll, 0));
         f.render_widget(paragraph, area);
+        return;
+    }
+
+    if app.mode == AppMode::Home {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(30), Constraint::Percentage(40), Constraint::Percentage(30)])
+            .split(area);
+
+        let button_row = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(20),
+                Constraint::Percentage(25),
+                Constraint::Percentage(10),
+                Constraint::Percentage(25),
+                Constraint::Percentage(20),
+            ])
+            .split(chunks[1]);
+
+        let install_style = if app.home_selected_index == 0 {
+            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD | Modifier::REVERSED)
+        } else {
+            Style::default().fg(Color::Green)
+        };
+
+        let uninstall_style = if app.home_selected_index == 1 {
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD | Modifier::REVERSED)
+        } else {
+            Style::default().fg(Color::Red)
+        };
+
+        let install_block = Block::default().borders(Borders::ALL).border_style(install_style);
+        let uninstall_block = Block::default().borders(Borders::ALL).border_style(uninstall_style);
+
+        let install_text = Paragraph::new("\n\nInstall").alignment(Alignment::Center).block(install_block);
+        let uninstall_text = Paragraph::new("\n\nUninstall").alignment(Alignment::Center).block(uninstall_block);
+
+        f.render_widget(install_text, button_row[1]);
+        f.render_widget(uninstall_text, button_row[3]);
         return;
     }
 
@@ -72,8 +112,14 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         _ => Style::default().fg(Color::DarkGray),
     };
 
+    let title = if app.action == crate::app::ActionType::Install {
+        " Search Arch Linux "
+    } else {
+        " Search Installed Packages "
+    };
+
     let search_block = Block::default()
-        .title(" Search Query ")
+        .title(title)
         .borders(Borders::ALL)
         .border_style(search_style);
 
@@ -131,7 +177,13 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
             
-        let paragraph = Paragraph::new("Authenticating...").alignment(Alignment::Center).block(auth_block);
+        let auth_text = if app.action == crate::app::ActionType::Install {
+            "Authenticating..."
+        } else {
+            "Uninstalling app..."
+        };
+            
+        let paragraph = Paragraph::new(auth_text).alignment(Alignment::Center).block(auth_block);
         
         f.render_widget(ratatui::widgets::Clear, popup_area); 
         f.render_widget(paragraph, popup_area);
@@ -175,12 +227,31 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 
 fn draw_footer(f: &mut Frame, app: &mut App, area: Rect) {
     let hints = match app.mode {
-        AppMode::Search => "[Enter] Search   [Esc] Quit   [Up/Down] Navigate",
-        AppMode::List => "[Enter] Install   [Esc] Search   [Down/J] Next   [Up/K] Prev",
+        AppMode::Home => "[Left/Right] Select Action   [Enter] Confirm   [Esc/Q] Quit",
+        AppMode::Search => "[Enter] Search   [Esc] Home   [Up/Down] Navigate",
+        AppMode::List => {
+            if app.action == crate::app::ActionType::Install {
+                "[Enter] Install   [Esc] Search   [Down/J] Next   [Up/K] Prev"
+            } else {
+                "[Enter] Uninstall   [Esc] Search   [Down/J] Next   [Up/K] Prev"
+            }
+        },
         AppMode::Password => "[Enter] Submit Password   [Esc] Cancel",
-        AppMode::Authenticating => "Verifying authentication in background...",
-        AppMode::Installing => "Installing securely in background...",
-        AppMode::InstallComplete => "[Enter/Esc] Return to Hub",
+        AppMode::Authenticating => {
+            if app.action == crate::app::ActionType::Install {
+                "Verifying authentication in background..."
+            } else {
+                "Uninstalling app..."
+            }
+        },
+        AppMode::Installing => {
+            if app.action == crate::app::ActionType::Install {
+                "Installing securely in background..."
+            } else {
+                "Uninstalling securely in background..."
+            }
+        },
+        AppMode::InstallComplete => "[Enter/Esc] Return to Home",
     };
 
     let footer = Paragraph::new(Line::from(Span::styled(hints, Style::default().fg(Color::Gray))))

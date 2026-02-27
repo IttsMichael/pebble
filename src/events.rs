@@ -3,6 +3,28 @@ use crate::app::{App, AppMode};
 
 pub fn handle_key(app: &mut App, key: KeyEvent) {
     match app.mode {
+        // --- When in the Home screen ---
+        AppMode::Home => match key.code {
+            KeyCode::Left | KeyCode::Right | KeyCode::Tab => {
+                app.home_selected_index = if app.home_selected_index == 0 { 1 } else { 0 };
+            }
+            KeyCode::Enter => {
+                app.action = if app.home_selected_index == 0 {
+                    crate::app::ActionType::Install
+                } else {
+                    crate::app::ActionType::Uninstall
+                };
+                app.mode = AppMode::Search;
+                app.search_input.clear();
+                app.search_results.clear();
+                app.list_state.select(None);
+            }
+            KeyCode::Esc | KeyCode::Char('q') => {
+                app.should_quit = true;
+            }
+            _ => {}
+        },
+
         // --- When in the search box ---
         AppMode::Search => match key.code {
             KeyCode::Enter => {
@@ -16,10 +38,14 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
                 app.search_input.push(c);
             }
             KeyCode::Backspace => {
-                app.search_input.pop();
+                if app.search_input.is_empty() {
+                    app.mode = AppMode::Home;
+                } else {
+                    app.search_input.pop();
+                }
             }
             KeyCode::Esc => {
-                app.should_quit = true;
+                app.mode = AppMode::Home;
             }
             KeyCode::Down => {
                 if !app.search_results.is_empty() {
@@ -87,9 +113,12 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         // --- Return to Hub ---
         AppMode::InstallComplete => match key.code {
             KeyCode::Enter | KeyCode::Esc => {
-                app.mode = AppMode::Search;
+                app.mode = AppMode::Home;
                 app.install_logs.clear();
                 app.install_rx = None;
+                app.search_input.clear();
+                app.search_results.clear();
+                app.list_state.select(None);
             }
             _ => {}
         },
