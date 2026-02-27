@@ -37,14 +37,14 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
             KeyCode::Char(c) => {
                 app.search_input.push(c);
                 if app.search_input.len() >= 3 {
-                    app.execute_search();
+                    app.mark_search_dirty();
                 }
             }
             KeyCode::Backspace => {
                 app.search_input.pop();
                 if app.search_input.len() >= 3 {
-                    app.execute_search();
-                } else if app.search_input.is_empty() {
+                    app.mark_search_dirty();
+                } else {
                     app.search_results.clear();
                     app.list_state.select(None);
                 }
@@ -60,8 +60,8 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
 
         // --- When navigating the list ---
         AppMode::List => match key.code {
-            KeyCode::Char('q') | KeyCode::Esc => {
-                // Pressing Esc removes focus from the list and returns to the search bar
+            KeyCode::Char('q') | KeyCode::Esc | KeyCode::Left | KeyCode::Right | KeyCode::Tab | KeyCode::BackTab => {
+                // Pressing Esc or navigation keys returns focus to the search bar
                 app.mode = AppMode::Search;
                 app.list_state.select(None);
             }
