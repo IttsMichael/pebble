@@ -113,7 +113,7 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     };
 
     let title = if app.action == crate::app::ActionType::Install {
-        " Search Arch Linux "
+        " Search Packages "
     } else {
         " Search Installed Packages "
     };
