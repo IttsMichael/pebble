@@ -12,6 +12,7 @@ mod ui;
 mod events;
 mod backend;
 mod models;
+mod mouse;
 
 use app::App;
 use models::AppConfig;
@@ -52,8 +53,10 @@ fn run_app<B: Backend + io::Write>(terminal: &mut Terminal<B>, app: &mut App) ->
                 if key.kind == KeyEventKind::Press {
                     events::handle_key(app, key);
                 }
-            } else if let Event::Mouse(mouse) = event::read()? {
-                events::handle_mouse(app, mouse);
+            } else if let Event::Mouse(mouse_event) = event::read()? {
+                if let Some(key) = mouse::handle_mouse(app, mouse_event) {
+                    events::handle_key(app, key);
+                }
             }
         }
 

@@ -124,20 +124,4 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
     }
 }
 
-pub fn handle_mouse(app: &mut App, mouse: MouseEvent) {
-    match mouse.kind {
-        MouseEventKind::ScrollDown => {
-            if !app.search_results.is_empty() {
-                app.mode = AppMode::List;
-                app.next();
-            }
-        }
-        MouseEventKind::ScrollUp => {
-            if !app.search_results.is_empty() {
-                app.mode = AppMode::List;
-                app.previous();
-            }
-        }
-        _ => {}
-    }
-}
+
