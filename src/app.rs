@@ -163,6 +163,15 @@ impl App {
     // --- List Navigation Helpers ---
     
     pub fn next(&mut self) {
+        if self.search_results.is_empty() { return; }
+        
+        // If we are coming from Search mode, jump instantly into the list
+        if self.mode == AppMode::Search {
+            self.mode = AppMode::List;
+            self.list_state.select(Some(0));
+            return;
+        }
+
         let i = match self.list_state.selected() {
             Some(i) => {
                 if i >= self.search_results.len().saturating_sub(1) {
@@ -177,10 +186,15 @@ impl App {
     }
 
     pub fn previous(&mut self) {
+        if self.search_results.is_empty() { return; }
+        
         let i = match self.list_state.selected() {
             Some(i) => {
                 if i == 0 {
-                    self.search_results.len().saturating_sub(1)
+                    // Jump back to search
+                    self.mode = AppMode::Search;
+                    self.list_state.select(None);
+                    return;
                 } else {
                     i - 1
                 }

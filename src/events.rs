@@ -28,11 +28,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         // --- When in the search box ---
         AppMode::Search => match key.code {
             KeyCode::Enter | KeyCode::Down => {
-                if !app.search_results.is_empty() {
-                    // Instantly shift focus to the list once results populate
-                    app.mode = AppMode::List;
-                    app.list_state.select(Some(0));
-                }
+                app.next();
             }
             KeyCode::Char(c) => {
                 app.search_input.push(c);
