@@ -1,9 +1,10 @@
 use crate::models::{AppConfig, Package};
-use crate::pacman;
+use crate::backend;
 use ratatui::widgets::ListState;
 
 #[derive(PartialEq)]
 pub enum AppMode {
+    Home,
     Search,
     List,
     Password,
@@ -12,9 +13,17 @@ pub enum AppMode {
     InstallComplete,
 }
 
+#[derive(PartialEq, Clone)]
+pub enum ActionType {
+    Install,
+    Uninstall,
+}
+
 pub struct App {
     pub config: AppConfig,
     pub mode: AppMode,
+    pub action: ActionType,
+    pub home_selected_index: usize, // 0 for Install, 1 for Uninstall
     
     // Search Box State
     pub search_input: String,
@@ -37,7 +46,9 @@ impl App {
     pub fn new(config: AppConfig) -> Self {
         Self {
             config,
-            mode: AppMode::Search,
+            mode: AppMode::Home,
+            action: ActionType::Install,
+            home_selected_index: 0,
             search_input: String::new(),
             search_results: Vec::new(),
             list_state: ListState::default(),
@@ -52,7 +63,11 @@ impl App {
     /// Triggers a background search and updates the list exactly.
     pub fn execute_search(&mut self) {
         if !self.search_input.is_empty() {
-            self.search_results = pacman::search(&self.search_input);
+            if self.action == ActionType::Install {
+                self.search_results = backend::search(&self.search_input);
+            } else {
+                self.search_results = backend::search_installed(&self.search_input);
+            }
             
             if !self.search_results.is_empty() {
                 self.list_state.select(Some(0));
@@ -65,7 +80,7 @@ impl App {
     /// Instead of dropping out of the UI, we trigger our sudo prompt or spawn our thread natively.
     pub fn execute_install(&mut self) {
         if self.list_state.selected().is_some() {
-            if pacman::needs_sudo_password() {
+            if backend::needs_sudo_password() {
                 self.mode = AppMode::Password;
                 self.password_input.clear();
                 self.password_error = None;
@@ -84,7 +99,11 @@ impl App {
                 
                 let (tx, rx) = std::sync::mpsc::channel();
                 self.install_rx = Some(rx);
-                pacman::install_async(pkg, password, tx, self.config.clone());
+                if self.action == ActionType::Install {
+                    backend::install_async(pkg, password, tx, self.config.clone());
+                } else {
+                    backend::uninstall_async(pkg, password, tx, self.config.clone());
+                }
             }
         }
     }
