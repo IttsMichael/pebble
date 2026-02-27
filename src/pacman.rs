@@ -1,6 +1,5 @@
 use std::process::{Command, Stdio};
-use std::io::{BufRead, BufReader, Write, self};
-use crossterm::style::Stylize;
+use std::io::{BufRead, BufReader, Write};
 use crate::models::{Package, AppConfig};
 
 /// Execute a quiet pacman search and parse the results natively
@@ -68,12 +67,36 @@ pub fn install_async(
     let _ = tx.send(format!("Starting installation for {}...", package.name));
     
     std::thread::spawn(move || {
+        // 1. If a password was provided, verify it synchronously BEFORE starting the massive install thread!
+        if let Some(pw) = &password {
+            let mut auth_cmd = Command::new("sudo");
+            auth_cmd.args(["-S", "-v"]) // Update cached credentials
+               .stdin(Stdio::piped())
+               .stdout(Stdio::null())
+               .stderr(Stdio::piped());
+
+            if let Ok(mut child) = auth_cmd.spawn() {
+                if let Some(mut stdin) = child.stdin.take() {
+                    let _ = writeln!(stdin, "{}", pw);
+                }
+                
+                if let Ok(status) = child.wait() {
+                    if !status.success() {
+                        // Password was wrong! Inform the TUI instantly without ever calling pacman
+                        let _ = tx.send("1 incorrect password attempt".to_string());
+                        return;
+                    }
+                }
+            }
+        }
+
         let package_id = package.name.split_whitespace().next().unwrap_or(&package.name).to_string();
         
         let mut cmd = Command::new("sudo");
-        cmd.args(["-S", "pacman", "-S", "--noconfirm", &package_id]);
+        // No -S required! Credentials are valid!
+        cmd.args(["pacman", "-S", "--noconfirm", &package_id]);
         
-        cmd.stdin(Stdio::piped())
+        cmd.stdin(Stdio::null())
            .stdout(Stdio::piped())
            .stderr(Stdio::piped());
            
@@ -84,13 +107,6 @@ pub fn install_async(
                 return;
             }
         };
-
-        // Feed password into stdin if we have one
-        if let Some(mut stdin) = child.stdin.take() {
-            if let Some(pw) = password {
-                let _ = writeln!(stdin, "{}", pw);
-            }
-        }
 
         // Pipe stdout to the TUI renderer loop natively!
         if let Some(stdout) = child.stdout.take() {

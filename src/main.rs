@@ -62,10 +62,14 @@ fn run_app<B: Backend + io::Write>(terminal: &mut Terminal<B>, app: &mut App) ->
             return Ok(());
         }
 
-        // We poll the RX queue continuously and update the UI natively
+                // We poll the RX queue continuously and update the UI natively
         if let Some(rx) = &app.install_rx {
             while let Ok(msg) = rx.try_recv() {
-                if msg.starts_with("CLRLINE_ILOVECANDY") {
+                if msg.starts_with("Starting installation for") {
+                    // Auth was successful! Render the logs list going forward natively!
+                    app.mode = app::AppMode::Installing;
+                    app.install_logs.push(msg);
+                } else if msg.starts_with("CLRLINE_ILOVECANDY") {
                     // Update the last line for ILoveCandy animation effect!
                     let anim_frame = msg.replace("CLRLINE_ILOVECANDY", "");
                     if let Some(last) = app.install_logs.last_mut() {
@@ -77,6 +81,14 @@ fn run_app<B: Backend + io::Write>(terminal: &mut Terminal<B>, app: &mut App) ->
                     } else {
                         app.install_logs.push(anim_frame);
                     }
+                } else if msg.contains("1 incorrect password attempt") || msg.contains("Sorry, try again") {
+                    // Instantly kick the user back to the password modal natively!
+                    app.mode = app::AppMode::Password;
+                    app.password_error = Some("Incorrect password. Please try again.".to_string());
+                    app.password_input.clear();
+                    app.install_logs.clear();
+                    app.install_rx = None;
+                    break;
                 } else if msg.contains("Installation Complete") || msg.contains("failed with status") {
                     app.install_logs.push(msg);
                     app.mode = app::AppMode::InstallComplete;
