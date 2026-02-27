@@ -1,6 +1,8 @@
 use crate::models::{AppConfig, Package};
 use crate::backend;
 use ratatui::widgets::ListState;
+use std::sync::mpsc::Receiver;
+use std::time::Instant;
 
 #[derive(PartialEq)]
 pub enum AppMode {
@@ -32,6 +34,11 @@ pub struct App {
     pub search_results: Vec<Package>,
     pub list_state: ListState,
     
+    // Async Search State
+    pub search_rx: Option<Receiver<Vec<Package>>>,
+    pub last_keystroke: Option<Instant>,
+    pub search_pending: bool,
+
     // Installation State
     pub password_input: String,
     pub password_error: Option<String>,
@@ -52,6 +59,9 @@ impl App {
             search_input: String::new(),
             search_results: Vec::new(),
             list_state: ListState::default(),
+            search_rx: None,
+            last_keystroke: None,
+            search_pending: false,
             password_input: String::new(),
             password_error: None,
             install_logs: Vec::new(),
@@ -60,21 +70,61 @@ impl App {
         }
     }
 
-    /// Triggers a background search and updates the list exactly.
-    pub fn execute_search(&mut self) {
-        if !self.search_input.is_empty() {
-            let mut raw_results = if self.action == ActionType::Install {
-                backend::search(&self.search_input)
+    /// Mark that the user typed something — debounce will fire the actual search later.
+    pub fn mark_search_dirty(&mut self) {
+        self.last_keystroke = Some(Instant::now());
+        self.search_pending = true;
+    }
+
+    /// Called every frame from the main loop. Fires the async search once
+    /// 150 ms have elapsed since the last keystroke.
+    pub fn check_debounce(&mut self) {
+        if !self.search_pending {
+            return;
+        }
+        if let Some(ts) = self.last_keystroke {
+            if ts.elapsed().as_millis() >= 150 {
+                self.search_pending = false;
+                self.trigger_search();
+            }
+        }
+    }
+
+    /// Spawns the pacman search on a background thread so the UI never blocks.
+    fn trigger_search(&mut self) {
+        let query = self.search_input.clone();
+        if query.trim().is_empty() || query.len() < 3 {
+            return;
+        }
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.search_rx = Some(rx);
+
+        let is_install = self.action == ActionType::Install;
+
+        std::thread::spawn(move || {
+            let raw = if is_install {
+                backend::search(&query)
             } else {
-                backend::search_installed(&self.search_input)
+                backend::search_installed(&query)
             };
-            
-            self.search_results = backend::scoring::sort_packages(&self.search_input, raw_results);
-            
-            if !self.search_results.is_empty() {
-                self.list_state.select(Some(0));
-            } else {
-                self.list_state.select(None);
+            let sorted = backend::scoring::sort_packages(&query, raw);
+            let _ = tx.send(sorted);
+        });
+    }
+
+    /// Called every frame from the main loop. Picks up results from the
+    /// background search thread when they arrive.
+    pub fn poll_search_results(&mut self) {
+        if let Some(rx) = &self.search_rx {
+            if let Ok(results) = rx.try_recv() {
+                self.search_results = results;
+                if !self.search_results.is_empty() {
+                    self.list_state.select(Some(0));
+                } else {
+                    self.list_state.select(None);
+                }
+                self.search_rx = None;
             }
         }
     }

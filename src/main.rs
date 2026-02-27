@@ -57,6 +57,12 @@ fn run_app<B: Backend + io::Write>(terminal: &mut Terminal<B>, app: &mut App) ->
             }
         }
 
+        // Check if the debounce timer has elapsed and fire async search
+        app.check_debounce();
+
+        // Pick up results from background search thread
+        app.poll_search_results();
+
         // Did the user trigger an exit?
         if app.should_quit {
             return Ok(());
